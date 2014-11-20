@@ -337,10 +337,9 @@ public class ServletTest extends TestCase {
 	public void test_Registration1() throws Exception {
 		String expected = "Alias cannot be null";
 		try {
-			ExtendedHttpService extendedHttpService = (ExtendedHttpService)getHttpService();
+			HttpService httpService = getHttpService();
 
-			extendedHttpService.registerServlet(
-				null, new BaseServlet(), null, null);
+			httpService.registerServlet(null, new BaseServlet(), null, null);
 		}
 		catch(IllegalArgumentException iae) {
 			Assert.assertEquals(expected, iae.getMessage());
@@ -355,10 +354,9 @@ public class ServletTest extends TestCase {
 		String pattern = "blah";
 		String expected = "Invalid pattern '" + pattern + "'";
 		try {
-			ExtendedHttpService extendedHttpService = (ExtendedHttpService)getHttpService();
+			HttpService httpService = getHttpService();
 
-			extendedHttpService.registerServlet(
-				pattern, new BaseServlet(), null, null);
+			httpService.registerServlet(pattern, new BaseServlet(), null, null);
 		}
 		catch(IllegalArgumentException iae) {
 			Assert.assertEquals(expected, iae.getMessage());
@@ -373,10 +371,9 @@ public class ServletTest extends TestCase {
 		String pattern = "/blah/";
 		String expected = "Invalid pattern '" + pattern + "'";
 		try {
-			ExtendedHttpService extendedHttpService = (ExtendedHttpService)getHttpService();
+			HttpService httpService = getHttpService();
 
-			extendedHttpService.registerServlet(
-				pattern, new BaseServlet(), null, null);
+			httpService.registerServlet(pattern, new BaseServlet(), null, null);
 		}
 		catch(IllegalArgumentException iae) {
 			Assert.assertEquals(expected, iae.getMessage());
@@ -391,12 +388,10 @@ public class ServletTest extends TestCase {
 		String pattern = "/blah";
 		String expected = "Pattern already in use: " + pattern;
 		try {
-			ExtendedHttpService extendedHttpService = (ExtendedHttpService)getHttpService();
+			HttpService httpService = getHttpService();
 
-			extendedHttpService.registerServlet(
-				pattern, new BaseServlet(), null, null);
-			extendedHttpService.registerServlet(
-				pattern, new BaseServlet(), null, null);
+			httpService.registerServlet(pattern, new BaseServlet(), null, null);
+			httpService.registerServlet(pattern, new BaseServlet(), null, null);
 		}
 		catch(NamespaceException ne) {
 			Assert.assertEquals(expected, ne.getMessage());
@@ -411,10 +406,9 @@ public class ServletTest extends TestCase {
 		String alias = "/blah";
 		String expected = "Servlet cannot be null";
 		try {
-			ExtendedHttpService extendedHttpService = (ExtendedHttpService)getHttpService();
+			HttpService httpService = getHttpService();
 
-			extendedHttpService.registerServlet(
-				alias, null, null, null);
+			httpService.registerServlet(alias, null, null, null);
 		}
 		catch(IllegalArgumentException iae) {
 			Assert.assertEquals(expected, iae.getMessage());
@@ -428,12 +422,12 @@ public class ServletTest extends TestCase {
 	public void test_Registration6() throws Exception {
 		String expected = "Servlet has already been registered:";
 		try {
-			ExtendedHttpService extendedHttpService = (ExtendedHttpService)getHttpService();
+			HttpService httpService = getHttpService();
 
 			Servlet servlet = new BaseServlet();
 
-			extendedHttpService.registerServlet("/blah1", servlet, null, null);
-			extendedHttpService.registerServlet("/blah2", servlet, null, null);
+			httpService.registerServlet("/blah1", servlet, null, null);
+			httpService.registerServlet("/blah2", servlet, null, null);
 		}
 		catch(ServletException se) {
 			Assert.assertTrue(se.getMessage().startsWith(expected));
@@ -712,9 +706,9 @@ public class ServletTest extends TestCase {
 	public void test_Registration9() throws Exception {
 		String expected = "Prefix cannot be null";
 		try {
-			ExtendedHttpService extendedHttpService = (ExtendedHttpService)getHttpService();
+			HttpService httpService = getHttpService();
 
-			extendedHttpService.registerResources("/blah", null, null);
+			httpService.registerResources("/blah", null, null);
 		}
 		catch(IllegalArgumentException iae) {
 			Assert.assertEquals(expected, iae.getMessage());
@@ -729,9 +723,9 @@ public class ServletTest extends TestCase {
 		String prefix = "/blah2/";
 		String expected = "Invalid prefix '" + prefix + "'";
 		try {
-			ExtendedHttpService extendedHttpService = (ExtendedHttpService)getHttpService();
+			HttpService httpService = getHttpService();
 
-			extendedHttpService.registerResources("/blah1", prefix, null);
+			httpService.registerResources("/blah1", prefix, null);
 		}
 		catch(IllegalArgumentException iae) {
 			Assert.assertEquals(expected, iae.getMessage());
@@ -743,13 +737,14 @@ public class ServletTest extends TestCase {
 	}
 
 	public void test_Registration11() throws Exception {
-		ExtendedHttpService extendedHttpService = (ExtendedHttpService)getHttpService();
+		HttpService httpService = getHttpService();
 
 		Servlet servlet = new BaseServlet();
 
-		extendedHttpService.registerServlet("/blah1", servlet, null, null);
+		httpService.registerServlet("/blah1", servlet, null, null);
 
 		BundleContext bundleContext = getBundleContext();
+		Bundle bundle = bundleContext.getBundle();
 
 		ServiceReference<HttpServiceRuntime> serviceReference =
 			bundleContext.getServiceReference(HttpServiceRuntime.class);
@@ -759,7 +754,20 @@ public class ServletTest extends TestCase {
 
 		ServletContextDTO[] servletContextDTOs = runtimeDTO.servletContextDTOs;
 
-		ServletDTO servletDTO = servletContextDTOs[0].servletDTOs[0];
+		Assert.assertTrue(servletContextDTOs.length > 0);
+
+		ServletContextDTO servletContextDTO = null;
+
+		for (ServletContextDTO curServletContextDTO : servletContextDTOs) {
+			if (curServletContextDTO.contextName.equals(String.valueOf(bundle.getBundleId()))) {
+				servletContextDTO = curServletContextDTO;
+				break;
+			}
+		}
+
+		Assert.assertNotNull(servletContextDTO);
+
+		ServletDTO servletDTO = servletContextDTO.servletDTOs[0];
 
 		Assert.assertFalse(servletDTO.asyncSupported);
 		Assert.assertEquals(servlet.getClass().getName(), servletDTO.name);
@@ -792,21 +800,34 @@ public class ServletTest extends TestCase {
 	}
 
 	public void test_Registration13() throws Exception {
-		ExtendedHttpService extendedHttpService = (ExtendedHttpService)getHttpService();
+		HttpService httpService = getHttpService();
 
-		extendedHttpService.registerResources("/blah1", "/foo", null);
+		httpService.registerResources("/blah1", "/foo", null);
 
 		BundleContext bundleContext = getBundleContext();
+		Bundle bundle = bundleContext.getBundle();
 
 		ServiceReference<HttpServiceRuntime> serviceReference =
 			bundleContext.getServiceReference(HttpServiceRuntime.class);
+
 		HttpServiceRuntime runtime = bundleContext.getService(serviceReference);
-
 		RuntimeDTO runtimeDTO = runtime.getRuntimeDTO();
-
 		ServletContextDTO[] servletContextDTOs = runtimeDTO.servletContextDTOs;
 
-		ResourceDTO resourceDTO = servletContextDTOs[0].resourceDTOs[0];
+		Assert.assertTrue(servletContextDTOs.length > 0);
+
+		ServletContextDTO servletContextDTO = null;
+
+		for (ServletContextDTO curServletContextDTO : servletContextDTOs) {
+			if (curServletContextDTO.contextName.equals(String.valueOf(bundle.getBundleId()))) {
+				servletContextDTO = curServletContextDTO;
+				break;
+			}
+		}
+
+		Assert.assertNotNull(servletContextDTO);
+
+		ResourceDTO resourceDTO = servletContextDTO.resourceDTOs[0];
 
 		Assert.assertEquals("/blah1/*", resourceDTO.patterns[0]);
 		Assert.assertEquals("/foo", resourceDTO.prefix);

@@ -518,8 +518,6 @@ public class HttpServiceRuntimeImpl
 
 		contextControllers.add(contextController);
 
-		contextPathMap.put(contextPath, contextControllers);
-
 		return contextController;
 	}
 

@@ -18,18 +18,17 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.osgi.framework.Bundle;
 import org.osgi.service.http.HttpContext;
-import org.osgi.service.http.context.ServletContextHelper;
 
 /**
  * @author Raymond Augé
  */
 public class ServletContextHelperWrapper
-	extends ServletContextHelper implements HttpContext {
+	extends NamedServletContextHelper implements HttpContext {
 
 	public ServletContextHelperWrapper(
-		HttpContext httpContext, Bundle bundle) {
+		HttpContext httpContext, Bundle bundle, String contextName) {
 
-		super(bundle);
+		super(bundle, contextName);
 
 		_httpContext = httpContext;
 		_bundle = bundle;

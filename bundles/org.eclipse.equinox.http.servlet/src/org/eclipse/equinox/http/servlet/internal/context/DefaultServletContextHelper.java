@@ -15,13 +15,12 @@ package org.eclipse.equinox.http.servlet.internal.context;
 
 import org.osgi.framework.Bundle;
 import org.osgi.service.http.HttpContext;
-import org.osgi.service.http.context.ServletContextHelper;
 
-public class DefaultServletContextHelper extends ServletContextHelper
+public class DefaultServletContextHelper extends NamedServletContextHelper
 	implements HttpContext {
 
-	public DefaultServletContextHelper(Bundle bundle) {
-		super(bundle);
+	public DefaultServletContextHelper(Bundle bundle, String contextName) {
+		super(bundle, contextName);
 	}
 
 }

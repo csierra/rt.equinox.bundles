@@ -667,8 +667,8 @@ public class ContextController {
 		ServletContext servletContext = getProxyContext().getServletContext();
 
 		servletContextDTO.attributes = getAttributes(servletContext);
-		servletContextDTO.contextName = servletContext.getServletContextName();
-		servletContextDTO.contextPath = servletContext.getContextPath();
+		servletContextDTO.contextName = contextName;
+		servletContextDTO.contextPath = contextPath;
 		servletContextDTO.initParams = initParams;
 		servletContextDTO.name = getContextName();
 		servletContextDTO.serviceId = getServiceId();

@@ -38,7 +38,7 @@ public class HttpServiceImpl implements HttpService, ExtendedHttpService {
 	private final ConcurrentMap<ContextController, Map<Object, Registration<?, ?>>> registrations;
 
 	private final ConcurrentMap<ServletContextHelper, ContextController> servletContextHelperRegistrations = new ConcurrentHashMap<ServletContextHelper, ContextController>();
-	private final ConcurrentMap<HttpContext, ServletContextHelper> contextMap = new ConcurrentHashMap<HttpContext, ServletContextHelper>();
+	private final ConcurrentMap<HttpContext, NamedServletContextHelper> contextMap = new ConcurrentHashMap<HttpContext, NamedServletContextHelper>();
 	private DefaultServletContextHelper defaultServletContextHelper;
 	private final AtomicLong legacyServiceIdGenerator;
 	private boolean shutdown = false; // We prevent use of this instance if HttpServiceFactory.ungetService has called unregisterAliases.
@@ -53,7 +53,7 @@ public class HttpServiceImpl implements HttpService, ExtendedHttpService {
 		this.legacyServiceIdGenerator =
 			httpServiceRuntime.getLegacyServiceIdGenerator();
 		this.defaultServletContextHelper = new DefaultServletContextHelper(
-			this.bundle);
+			this.bundle, String.valueOf(bundle.getBundleId()));
 	}
 
 	/**
@@ -672,34 +672,37 @@ public class HttpServiceImpl implements HttpService, ExtendedHttpService {
 		return map;
 	}
 
-	private String calculateContextSelector(
-		String contextSelector, HttpContext httpContext) {
-
+	private String calculateContextSelector(String contextSelector, HttpContext httpContext) {
 		if (contextSelector != null) {
 			return contextSelector;
 		}
-
-		ServletContextHelper servletContextHelper = null;
 
 		if (httpContext == null) {
 			httpContext = defaultServletContextHelper;
 		}
 
-		servletContextHelper = contextMap.get(httpContext);
+		NamedServletContextHelper servletContextHelper = contextMap.get(httpContext);
 
 		if (servletContextHelper == null) {
-			if (httpContext instanceof ServletContextHelper) {
-				servletContextHelper = (ServletContextHelper)httpContext;
+			if (httpContext == defaultServletContextHelper) {
+				servletContextHelper = defaultServletContextHelper;
+			}
+			else if (httpContext instanceof ServletContextHelper) {
+				throw new IllegalStateException("HttpContext cannot implement ServletContextHelper");
 			}
 			else {
 				servletContextHelper = new ServletContextHelperWrapper(
-					httpContext, bundle);
+					httpContext, bundle, bundle.getBundleId() + "#" + httpContext.hashCode());
 			}
 
-			contextMap.putIfAbsent(httpContext, servletContextHelper);
+			NamedServletContextHelper original = contextMap.putIfAbsent(httpContext, servletContextHelper);
+
+			if (original != null) {
+				servletContextHelper = original;
+			}
 		}
 
-		return String.valueOf(bundle.getBundleId()) + '#' + httpContext.hashCode();
+		return servletContextHelper.getContextName();
 	}
 
 }
