@@ -777,6 +777,9 @@ public class ServletTest extends TestCase {
 
 
 	public void basicFilterTest22( String servlet1Pattern, String servlet2Pattern, String filterPattern, String expected, String[] dispatchers ) throws Exception {
+		final AtomicReference<HttpServletRequestWrapper> httpServletRequestWrapper = new AtomicReference<HttpServletRequestWrapper>();
+		final AtomicReference<HttpServletResponseWrapper> httpServletResponseWrapper = new AtomicReference<HttpServletResponseWrapper>();
+
 		Servlet servlet1 = new BaseServlet() {
 			private static final long serialVersionUID = 1L;
 
@@ -787,7 +790,24 @@ public class ServletTest extends TestCase {
 			}
 		};
 
-		Servlet servlet2 = new BaseServlet("a");
+		Servlet servlet2 = new BaseServlet("a") {
+
+			@Override
+			protected void service(
+				HttpServletRequest request, HttpServletResponse response)
+				throws ServletException, IOException {
+
+				if ((httpServletRequestWrapper.get() != null) && !request.equals(httpServletRequestWrapper.get())) {
+					throw new ServletException("not the same request");
+				}
+				if ((httpServletResponseWrapper.get() != null) && !response.equals(httpServletResponseWrapper.get())) {
+					throw new ServletException("not the same response");
+				}
+
+				response.getWriter().print(content);
+			}
+
+		};
 
 		Filter filter = new TestFilter() {
 
@@ -798,9 +818,10 @@ public class ServletTest extends TestCase {
 
 				response.getWriter().write('b');
 
-				chain.doFilter(
-					new HttpServletRequestWrapper((HttpServletRequest) request),
-					new HttpServletResponseWrapper((HttpServletResponse) response));
+				httpServletRequestWrapper.set(new HttpServletRequestWrapper((HttpServletRequest) request));
+				httpServletResponseWrapper.set(new HttpServletResponseWrapper((HttpServletResponse) response));
+
+				chain.doFilter(httpServletRequestWrapper.get(), httpServletResponseWrapper.get());
 
 				response.getWriter().write('b');
 			}

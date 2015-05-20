@@ -385,30 +385,36 @@ public class HttpServiceRuntimeImpl
 			return false;
 		}
 
-		ContextController contextController =
-			dispatchTargets.getContextController();
-		DispatcherType dispatcherType = DispatcherType.REQUEST;
-
-		if (request.getAttribute(RequestDispatcher.INCLUDE_REQUEST_URI) != null) {
-			request.setAttribute(RequestDispatcher.INCLUDE_CONTEXT_PATH, contextController.getContextPath());
-			request.setAttribute(RequestDispatcher.INCLUDE_PATH_INFO, dispatchTargets.getPathInfo());
-			request.setAttribute(RequestDispatcher.INCLUDE_QUERY_STRING, request.getQueryString());
-			request.setAttribute(RequestDispatcher.INCLUDE_REQUEST_URI, requestURI);
-			request.setAttribute(RequestDispatcher.INCLUDE_SERVLET_PATH, dispatchTargets.getServletPath());
-
-			dispatcherType = DispatcherType.INCLUDE;
+		if (!(request instanceof HttpServletRequestWrapper)) {
+			request = new HttpServletRequestBuilder(request, dispatchTargets).build();
 		}
-		else if (request.getAttribute(RequestDispatcher.FORWARD_REQUEST_URI) != null) {
-			dispatcherType = DispatcherType.FORWARD;
+		else {
+			HttpServletRequestWrapper wrapper = (HttpServletRequestWrapper)request;
+			HttpServletRequest wrapped = (HttpServletRequest)wrapper.getRequest();
+			while (wrapped instanceof HttpServletRequestWrapper) {
+				wrapper = (HttpServletRequestWrapper)wrapped;
+				wrapped = (HttpServletRequest)wrapper.getRequest();
+			}
+			wrapped = new HttpServletRequestBuilder(wrapped, dispatchTargets).build();
+			wrapper.setRequest(wrapped);
 		}
 
-		HttpServletRequest wrappedRequest = new HttpServletRequestBuilder(
-			request, dispatchTargets).build();
-		HttpServletResponseWrapper wrapperResponse =
-			new HttpServletResponseWrapperImpl(response);
+		if (!(response instanceof HttpServletResponseWrapper)) {
+			response = new HttpServletResponseWrapperImpl(response);
+		}
+		else {
+			HttpServletResponseWrapper wrapper = (HttpServletResponseWrapper)response;
+			HttpServletResponse wrapped = (HttpServletResponse)wrapper.getResponse();
+			while (wrapped instanceof HttpServletResponseWrapper) {
+				wrapper = (HttpServletResponseWrapper)wrapped;
+				wrapped = (HttpServletResponse)wrapper.getResponse();
+			}
+			wrapped = new HttpServletResponseWrapperImpl(wrapped);
+			wrapper.setResponse(wrapped);
+		}
 
 		ResponseStateHandler responseStateHandler = new ResponseStateHandler(
-			wrappedRequest, wrapperResponse, dispatchTargets, dispatcherType);
+			request, response, dispatchTargets, request.getDispatcherType());
 
 		responseStateHandler.processRequest();
 

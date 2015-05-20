@@ -171,8 +171,7 @@ public class ServletContextAdaptor {
 				servletContext.getContextPath().length()).concat(path);
 		}
 
-		return new RequestDispatcherAdaptor(
-			servletContext.getRequestDispatcher(path));
+		return servletContext.getRequestDispatcher(path);
 	}
 
 	public URL getResource(final String name) {
