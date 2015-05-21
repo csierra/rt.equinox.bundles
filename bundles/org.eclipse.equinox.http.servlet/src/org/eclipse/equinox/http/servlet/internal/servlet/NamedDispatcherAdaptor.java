@@ -29,50 +29,60 @@ public class NamedDispatcherAdaptor implements RequestDispatcher {
 	public void forward(ServletRequest req, ServletResponse resp)
 		throws IOException, ServletException {
 
-		if (req instanceof HttpServletRequestBuilder.RequestGetter)
-			req = ((HttpServletRequestBuilder.RequestGetter) req).getOriginalRequest();
-
-		doDispatch((HttpServletRequest)req, (HttpServletResponse)resp);
+		doDispatch((HttpServletRequest)req, (HttpServletResponse)resp, DispatcherType.FORWARD);
 	}
 
 	public void include(ServletRequest req, ServletResponse resp)
 		throws IOException, ServletException {
 
-		if (req instanceof HttpServletRequestBuilder.RequestGetter)
-			req = ((HttpServletRequestBuilder.RequestGetter) req).getOriginalRequest();
-
-		doDispatch((HttpServletRequest)req, (HttpServletResponse)resp);
+		doDispatch((HttpServletRequest)req, (HttpServletResponse)resp, DispatcherType.INCLUDE);
 	}
 
 	private void doDispatch(
-			HttpServletRequest request, HttpServletResponse response)
+			HttpServletRequest request, HttpServletResponse response,
+			DispatcherType dispatcherType)
 		throws IOException, ServletException {
 
-		DispatcherType dispatcherType = DispatcherType.REQUEST;
+		if (!(request instanceof HttpServletRequestWrapper) ||
+			(request instanceof HttpServletRequestBuilder)) {
+			request = new HttpServletRequestBuilder(request, dispatchTargets);
+		}
+		else {
+			HttpServletRequestWrapper wrapper = (HttpServletRequestWrapper)request;
+			HttpServletRequest wrapped = (HttpServletRequest)wrapper.getRequest();
+			while (wrapped instanceof HttpServletRequestWrapper) {
+				if (wrapped instanceof HttpServletRequestBuilder) {
+					break;
+				}
 
-		if (request.getAttribute("javax.servlet.include.request_uri") != null) {
-			request.setAttribute(
-				"javax.servlet.include.request_uri", request.getRequestURI());
-			request.setAttribute(
-				"javax.servlet.include.context_path",
-				dispatchTargets.getContextController().getContextPath());
-			request.setAttribute(
-				"javax.servlet.include.servlet_path",
-				dispatchTargets.getServletPath());
-			request.setAttribute(
-				"javax.servlet.include.path_info",
-				dispatchTargets.getPathInfo());
-
-			dispatcherType = DispatcherType.INCLUDE;
+				wrapper = (HttpServletRequestWrapper)wrapped;
+				wrapped = (HttpServletRequest)wrapper.getRequest();
+			}
+			wrapped = new HttpServletRequestBuilder(wrapped, dispatchTargets);
+			wrapper.setRequest(wrapped);
 		}
 
-		HttpServletRequest wrappedRequest = new HttpServletRequestBuilder(
-			request, dispatchTargets).build();
-		HttpServletResponseWrapper wrapperResponse =
-			new HttpServletResponseWrapperImpl(response);
+		if (!(response instanceof HttpServletResponseWrapper) ||
+			(response instanceof HttpServletResponseWrapperImpl)) {
+			response = new HttpServletResponseWrapperImpl(response);
+		}
+		else {
+			HttpServletResponseWrapper wrapper = (HttpServletResponseWrapper)response;
+			HttpServletResponse wrapped = (HttpServletResponse)wrapper.getResponse();
+			while (wrapped instanceof HttpServletResponseWrapper) {
+				if (wrapped instanceof HttpServletResponseWrapperImpl) {
+					break;
+				}
+
+				wrapper = (HttpServletResponseWrapper)wrapped;
+				wrapped = (HttpServletResponse)wrapper.getResponse();
+			}
+			wrapped = new HttpServletResponseWrapperImpl(wrapped);
+			wrapper.setResponse(wrapped);
+		}
 
 		ResponseStateHandler responseStateHandler = new ResponseStateHandler(
-			wrappedRequest, wrapperResponse, dispatchTargets, dispatcherType);
+			request, response, dispatchTargets, dispatcherType);
 
 		responseStateHandler.processRequest();
 	}

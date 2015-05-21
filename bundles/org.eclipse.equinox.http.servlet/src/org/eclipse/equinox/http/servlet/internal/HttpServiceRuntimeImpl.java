@@ -385,30 +385,40 @@ public class HttpServiceRuntimeImpl
 			return false;
 		}
 
-		if (!(request instanceof HttpServletRequestWrapper)) {
-			request = new HttpServletRequestBuilder(request, dispatchTargets).build();
+		if (!(request instanceof HttpServletRequestWrapper) ||
+			(request instanceof HttpServletRequestBuilder)) {
+			request = new HttpServletRequestBuilder(request, dispatchTargets);
 		}
 		else {
 			HttpServletRequestWrapper wrapper = (HttpServletRequestWrapper)request;
 			HttpServletRequest wrapped = (HttpServletRequest)wrapper.getRequest();
-			while (wrapped instanceof HttpServletRequestWrapper) {
-				wrapper = (HttpServletRequestWrapper)wrapped;
-				wrapped = (HttpServletRequest)wrapper.getRequest();
-			}
-			wrapped = new HttpServletRequestBuilder(wrapped, dispatchTargets).build();
+//			while (wrapped instanceof HttpServletRequestWrapper) {
+//				if (wrapped instanceof HttpServletRequestBuilder) {
+//					break;
+//				}
+//
+//				wrapper = (HttpServletRequestWrapper)wrapped;
+//				wrapped = (HttpServletRequest)wrapper.getRequest();
+//			}
+			wrapped = new HttpServletRequestBuilder(wrapped, dispatchTargets);
 			wrapper.setRequest(wrapped);
 		}
 
-		if (!(response instanceof HttpServletResponseWrapper)) {
+		if (!(response instanceof HttpServletResponseWrapper) ||
+			(response instanceof HttpServletResponseWrapperImpl)) {
 			response = new HttpServletResponseWrapperImpl(response);
 		}
 		else {
 			HttpServletResponseWrapper wrapper = (HttpServletResponseWrapper)response;
 			HttpServletResponse wrapped = (HttpServletResponse)wrapper.getResponse();
-			while (wrapped instanceof HttpServletResponseWrapper) {
-				wrapper = (HttpServletResponseWrapper)wrapped;
-				wrapped = (HttpServletResponse)wrapper.getResponse();
-			}
+//			while (wrapped instanceof HttpServletResponseWrapper) {
+//				if (wrapped instanceof HttpServletResponseWrapperImpl) {
+//					break;
+//				}
+//
+//				wrapper = (HttpServletResponseWrapper)wrapped;
+//				wrapped = (HttpServletResponse)wrapper.getResponse();
+//			}
 			wrapped = new HttpServletResponseWrapperImpl(wrapped);
 			wrapper.setResponse(wrapped);
 		}

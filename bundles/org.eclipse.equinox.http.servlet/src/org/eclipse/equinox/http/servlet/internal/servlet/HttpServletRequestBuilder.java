@@ -12,125 +12,41 @@
  *******************************************************************************/
 package org.eclipse.equinox.http.servlet.internal.servlet;
 
-import java.lang.reflect.*;
-import java.util.*;
+import java.util.List;
 import javax.servlet.*;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpSession;
+import javax.servlet.http.*;
 import org.eclipse.equinox.http.servlet.internal.context.DispatchTargets;
 import org.eclipse.equinox.http.servlet.internal.registration.EndpointRegistration;
 import org.eclipse.equinox.http.servlet.internal.util.Const;
 import org.eclipse.equinox.http.servlet.internal.util.EventListeners;
 import org.osgi.service.http.HttpContext;
 
-public class HttpServletRequestBuilder {
-
-	static interface RequestGetter {
-		HttpServletRequest getOriginalRequest();
-	}
+public class HttpServletRequestBuilder extends HttpServletRequestWrapper {
 
 	private DispatchTargets dispatchTargets;
 	private EndpointRegistration<?> servletRegistration;
-	private final HttpServletRequest request;
-	private HttpServletRequest requestProxy;
-
-	private final ThreadLocal<HttpServletRequest> requestTL = new ThreadLocal<HttpServletRequest>();
-
-	private final static Map<Method, Method> requestToHandlerMethods;
-
-	static {
-		requestToHandlerMethods = createContextToHandlerMethods();
-	}
-
-	private static Map<Method, Method> createContextToHandlerMethods() {
-		Map<Method, Method> methods = new HashMap<Method, Method>();
-		Method[] handlerMethods =
-			HttpServletRequestBuilder.class.getDeclaredMethods();
-
-		for (int i = 0; i < handlerMethods.length; i++) {
-			Method handlerMethod = handlerMethods[i];
-			String name = handlerMethod.getName();
-			Class<?>[] parameterTypes = handlerMethod.getParameterTypes();
-
-			try {
-				Method method = HttpServletRequest.class.getMethod(
-					name, parameterTypes);
-				methods.put(method, handlerMethod);
-			}
-			catch (NoSuchMethodException e) {
-				// do nothing
-			}
-		}
-
-		return methods;
-	}
 
 	public HttpServletRequestBuilder(HttpServletRequest request, DispatchTargets dispatchTargets) {
-		this.request = request;
+		super(request);
+
 		this.dispatchTargets = dispatchTargets;
 		this.servletRegistration = dispatchTargets.getServletRegistration();
-
-		this.requestProxy = (HttpServletRequest)Proxy.newProxyInstance(
-			getClass().getClassLoader(),
-			new Class[] {HttpServletRequest.class, RequestGetter.class},
-			new InvocationHandler() {
-
-				@Override
-				public Object invoke(Object proxy, Method method, Object[] args)
-					throws Throwable {
-
-					if (method.getName().equals("equals")) {
-						return args[0].equals(this);
-					}
-					if (method.getName().equals("getOriginalRequest")) {
-						return getOriginalRequest();
-					}
-
-					return HttpServletRequestBuilder.this.invoke(proxy, method, args);
-				}
-
-			}
-		);
-	}
-
-	public HttpServletRequest build() {
-		return requestProxy;
-	}
-
-	
-	Object invoke(Object proxy, Method method, Object[] args) throws Throwable{
-		requestTL.set((HttpServletRequest)proxy);
-
-		try {
-			Method m = requestToHandlerMethods.get(method);
-			try {
-				if (m != null) {
-					return m.invoke(this, args);
-				}
-				return method.invoke(request, args);
-			} catch (InvocationTargetException e) {
-				throw e.getCause();
-			}
-		}
-		finally {
-			requestTL.remove();
-		}
 	}
 
 	public String getAuthType() {
-		String authType = (String)request.getAttribute(HttpContext.AUTHENTICATION_TYPE);
+		String authType = (String)super.getAttribute(HttpContext.AUTHENTICATION_TYPE);
 		if (authType != null)
 			return authType;
 
-		return request.getAuthType();
+		return super.getAuthType();
 	}
 
 	public String getRemoteUser() {
-		String remoteUser = (String) request.getAttribute(HttpContext.REMOTE_USER);
+		String remoteUser = (String)super.getAttribute(HttpContext.REMOTE_USER);
 		if (remoteUser != null)
 			return remoteUser;
 
-		return request.getRemoteUser();
+		return super.getRemoteUser();
 	}
 
 	public String getPathInfo() {
@@ -142,8 +58,8 @@ public class HttpServletRequestBuilder {
 	}
 
 	public String getServletPath() {
-		if (request.getDispatcherType() == DispatcherType.INCLUDE)
-			return request.getServletPath();
+		if (super.getDispatcherType() == DispatcherType.INCLUDE)
+			return super.getServletPath();
 
 		if (dispatchTargets.getServletPath().equals(Const.SLASH)) {
 			return Const.BLANK;
@@ -157,12 +73,13 @@ public class HttpServletRequestBuilder {
 
 	public Object getAttribute(String attributeName) {
 		String servletPath = dispatchTargets.getServletPath();
+		if (super.getDispatcherType() == DispatcherType.INCLUDE) {
 			if (attributeName.equals(RequestDispatcher.INCLUDE_CONTEXT_PATH)) {
-				String contextPath = (String) request.getAttribute(RequestDispatcher.INCLUDE_CONTEXT_PATH);
+				String contextPath = (String)super.getAttribute(RequestDispatcher.INCLUDE_CONTEXT_PATH);
 				if (contextPath == null || contextPath.equals(Const.SLASH))
 					contextPath = Const.BLANK;
 
-				String includeServletPath = (String) request.getAttribute(RequestDispatcher.INCLUDE_SERVLET_PATH);
+				String includeServletPath = (String)super.getAttribute(RequestDispatcher.INCLUDE_SERVLET_PATH);
 				if (includeServletPath == null || includeServletPath.equals(Const.SLASH))
 					includeServletPath = Const.BLANK;
 
@@ -173,13 +90,17 @@ public class HttpServletRequestBuilder {
 				}
 				return servletPath;
 			} else if (attributeName.equals(RequestDispatcher.INCLUDE_PATH_INFO)) {
-				String pathInfoAttribute = (String) request.getAttribute(RequestDispatcher.INCLUDE_PATH_INFO);
+				String pathInfoAttribute = (String) super.getAttribute(RequestDispatcher.INCLUDE_PATH_INFO);
 				if (servletPath.equals(Const.SLASH)) {
 					return pathInfoAttribute;
 				}
 
 				if ((pathInfoAttribute == null) || (pathInfoAttribute.length() == 0)) {
 					return null;
+				}
+
+				if (pathInfoAttribute.startsWith(dispatchTargets.getContextController().getContextPath())) {
+					pathInfoAttribute = pathInfoAttribute.substring(dispatchTargets.getContextController().getContextPath().length());
 				}
 
 				if (pathInfoAttribute.startsWith(servletPath)) {
@@ -190,20 +111,24 @@ public class HttpServletRequestBuilder {
 					return null;
 
 				return pathInfoAttribute;
-			} else if (attributeName.equals(RequestDispatcher.FORWARD_PATH_INFO)) {
-				return request.getPathInfo();
 			}
+		}
+		else if (super.getDispatcherType() == DispatcherType.FORWARD) {
+			if (attributeName.equals(RequestDispatcher.FORWARD_PATH_INFO)) {
+				return super.getPathInfo();
+			}
+		}
 
-		return request.getAttribute(attributeName);
+		return super.getAttribute(attributeName);
 	}
 
 	public RequestDispatcher getRequestDispatcher(String path) {
 		if (!path.startsWith(getContextPath())) {
 			path = getContextPath().substring(
-				request.getContextPath().length()).concat(path);
+				super.getContextPath().length()).concat(path);
 		}
 
-		return request.getRequestDispatcher(path);
+		return super.getRequestDispatcher(path);
 	}
 
 	public static String getDispatchPathInfo(HttpServletRequest req) {
@@ -224,8 +149,13 @@ public class HttpServletRequestBuilder {
 		return req.getServletPath();
 	}
 
+	@Override
+	public HttpServletRequest getRequest() {
+		return (HttpServletRequest)super.getRequest();
+	}
+
 	public HttpSession getSession() {
-		HttpSession session = request.getSession();
+		HttpSession session = super.getSession();
 		if (session != null) {
 			return dispatchTargets.getContextController().getSessionAdaptor(
 				session, servletRegistration.getT().getServletConfig().getServletContext());
@@ -235,7 +165,7 @@ public class HttpServletRequestBuilder {
 	}
 
 	public HttpSession getSession(boolean create) {
-		HttpSession session = request.getSession(create);
+		HttpSession session = super.getSession(create);
 		if (session != null) {
 			return dispatchTargets.getContextController().getSessionAdaptor(
 				session, servletRegistration.getT().getServletConfig().getServletContext());
@@ -245,7 +175,7 @@ public class HttpServletRequestBuilder {
 	}
 
 	public void removeAttribute(String name) {
-		request.removeAttribute(name);
+		super.removeAttribute(name);
 
 		EventListeners eventListeners = dispatchTargets.getContextController().getEventListeners();
 
@@ -258,7 +188,7 @@ public class HttpServletRequestBuilder {
 
 		ServletRequestAttributeEvent servletRequestAttributeEvent =
 			new ServletRequestAttributeEvent(
-				servletRegistration.getServletContext(), requestProxy, name, null);
+				servletRegistration.getServletContext(), getRequest(), name, null);
 
 		for (ServletRequestAttributeListener servletRequestAttributeListener : listeners) {
 			servletRequestAttributeListener.attributeRemoved(
@@ -267,8 +197,8 @@ public class HttpServletRequestBuilder {
 	}
 
 	public void setAttribute(String name, Object value) {
-		boolean added = (request.getAttribute(name) == null);
-		request.setAttribute(name, value);
+		boolean added = (super.getAttribute(name) == null);
+		super.setAttribute(name, value);
 
 		EventListeners eventListeners = dispatchTargets.getContextController().getEventListeners();
 
@@ -281,7 +211,7 @@ public class HttpServletRequestBuilder {
 
 		ServletRequestAttributeEvent servletRequestAttributeEvent =
 			new ServletRequestAttributeEvent(
-				servletRegistration.getServletContext(), requestProxy, name, value);
+				servletRegistration.getServletContext(), getRequest(), name, value);
 
 		for (ServletRequestAttributeListener servletRequestAttributeListener : listeners) {
 			if (added) {
@@ -293,10 +223,6 @@ public class HttpServletRequestBuilder {
 					servletRequestAttributeEvent);
 			}
 		}
-	}
-
-	HttpServletRequest getOriginalRequest() {
-		return request;
 	}
 
 }
