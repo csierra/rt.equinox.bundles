@@ -37,6 +37,10 @@ public class Activator implements BundleActivator {
 	// Note: only used if the bundle is explicitly started (e.g. not "lazy" activated)
 	private static final String AUTOSTART = "org.eclipse.equinox.http.jetty.autostart"; //$NON-NLS-1$
 
+	// Controls whether the bundle activation policy is ignored or not
+	// Note: only useful if used with autostart=true
+	private static final String BUNDLE_ACTIVATION_POLICY_IGNORED = "org.eclipse.equinox.http.jetty.activation.policy.ignored"; //$NON-NLS-1$
+
 	// Jetty will use a basic stderr logger if no other logging mechanism is provided.
 	// This setting can be used to over-ride the stderr logger threshold(and only this default logger)
 	// Valid values are in increasing threshold: "debug", "info", "warn", "error", and "off"
@@ -72,6 +76,10 @@ public class Activator implements BundleActivator {
 
 	@SuppressWarnings("unchecked")
 	private boolean isBundleActivationPolicyUsed(BundleContext context) {
+		boolean bundleActivationPolicyIgnored = Details.getBoolean(context, BUNDLE_ACTIVATION_POLICY_IGNORED, false);
+		if (bundleActivationPolicyIgnored) {
+			return false;
+		}
 		@SuppressWarnings("rawtypes")
 		ServiceReference reference = context.getServiceReference(StartLevel.class.getName());
 		StartLevel sl = ((reference != null) ? (StartLevel) context.getService(reference) : null);
